@@ -1,0 +1,153 @@
+---
+title: "DATA 606 Final Project"
+author: "Peter Fernandes"
+date: "12/8/2020"
+output:
+  pdf_document: default
+  html_document:
+    includes:
+      in_header: header.html
+    css: ./lab.css
+    highlight: pygments
+    theme: cerulean
+    toc: true
+    toc_float: true
+editor_options: 
+  chunk_output_type: console
+---
+```{r}
+
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 1) Introduction
+
+Hate crimes and racism are one of the biggest social issues the world is suffering from. In the US there was surge in extremist groups and hate crimes after the election of Donald Trump, the last US president. In this project I will look into the hate crimes data between 9 to 18 Nov 2016 and try to see any relationship between the hate crimes and the states that chose Donald Trump and presence of minority groups.
+
+**Research question  - Is there a significant relationship between percentage of Trump voters and presence of minority and the rate of hate crimes in US during the period of 9 to 18th Nov 2016?**
+
+# 2) Data Display
+
+## Required libraries
+
+```{r}
+library(readr)
+library(ggplot2)
+library(DT)
+library(dplyr)
+```
+
+## Data repository
+
+Get the data from fivethirtyeight GitHub account
+
+```{r}
+initial <- read_csv("https://raw.githubusercontent.com/fivethirtyeight/data/master/hate-crimes/hate_crimes.csv")
+
+summary(initial)
+
+head(initial)
+
+
+```
+## Variables
+
+**Dependent variable** - hate_crimes_per_100k_splc (hate crimes per 100000 population per the Southern Poverty Law Center) and is numerical
+
+**Independent variable** - i)Whether the state was in Blue or Red and its categorical
+                          ii)vote share of non-whites which is numerical
+
+## Data cleaning
+
+There are in total 51 cases among which 4 have value NA for the variable hate_crimes_per_100k_splc so we will be considering the only 47 cases
+
+
+## Add new columns
+
+Create a dataframe of the above dataset. Add two columns ElectTrump where 1 is exceeds 50% vote share to Trump and 0 is less than 50%. Choice - to specify choice of candidate if Trump, Clinton or Split.
+
+```{r}
+hate_crimes <- data.frame(initial %>% select(state, share_non_white, share_voters_voted_trump, hate_crimes_per_100k_splc) %>% filter(hate_crimes_per_100k_splc > 0) %>% mutate(ElectTrump = case_when(share_voters_voted_trump > 0.5 ~ 1, share_voters_voted_trump < 0.5 ~ 0), Choice = 
+                                                                                                      case_when(share_voters_voted_trump > 0.5 ~ "Trump", share_voters_voted_trump <  0.5 ~ "Clinton",   TRUE ~ "Split")))
+
+```
+
+## View data using datatable
+
+```{r}
+datatable(hate_crimes)
+```
+
+## Visualize the data using histogram
+
+### Overall data
+
+We see from the below plot the hate_crimes data is skewed right, bimodal distribution and has few outliers
+```{r warning=FALSE, error=FALSE}
+ggplot(hate_crimes, aes(x=hate_crimes_per_100k_splc)) + geom_histogram(bins = 30)
+```
+
+### States that voted for Trump
+
+From the plot below we see the distribution nearly normal in the states that voted Trump    
+```{r}
+hate_crimes_trump <- filter(hate_crimes, ElectTrump==1)
+ggplot(hate_crimes_trump, aes(x=hate_crimes_per_100k_splc)) + geom_histogram(color="black", fill="grey")
+```
+
+### States that didn't voted for Trump
+
+We see the distribution looks like skewed right 
+
+```{r warning=FALSE}
+hate_crimes_trump <- filter(hate_crimes, ElectTrump==0)
+ggplot(hate_crimes_trump, aes(x=hate_crimes_per_100k_splc)) + geom_histogram(color="black", fill="grey")
+```
+
+### Crime versus non white share
+
+We see a large part of the crime is under 0.4 and as it goes above 0.4 the non_white share is under 0.3
+
+```{r}
+ggplot(hate_crimes, aes(x=share_non_white, y=hate_crimes_per_100k_splc)) + geom_point()
+```
+
+### Visualize over boxplot
+
+From the boxplot it appears that hate_crime rate is higher where the vote share for Democrats was higher. 
+
+```{r}
+
+ggplot(hate_crimes) + 
+  geom_boxplot(mapping = aes(x = as.factor(Choice), y = hate_crimes_per_100k_splc)) +
+  labs(x = "", y = "Average Hate Crimes") 
+
+```
+
+# 3) Data Analysis
+
+### Linear Regression
+
+```{r}
+model <- lm(hate_crimes_per_100k_splc ~ share_non_white + ElectTrump, hate_crimes)
+summary(model)
+```
+
+### Hypothesis Tests
+
+$H$<sub>0</sub> : Hate-crime rate is independent on Trump vote share and presence of minority in the state
+
+$H$<sub>1</sub> : Hate-crime rate is dependent on Trump vote share and presence of minority in the state
+
+From on the model values we see r-squared=0.14, p-value=0.03 which is less than 0.05. We  have sufficient evidence to reject our null hypothesis($H$<sub>0</sub>), which means the hate-crime is dependent on Trump vote share and presence on minority in the state.
+
+
+# 4) Conclusion
+
+From the data visualization we see there is higher crime rate in the states having higher Democratic vote share.
+
+From the model output it appears that with holding all the other predictors constant as the Trump vote share increases there will be a decrease of crime rate by 0.190565 per 100k population. Similarly, with all the other predictors constant as the non white share of population increases by 100k in the state there will be a decrease of hate crime rate by 0.007953.
+
